@@ -1,11 +1,14 @@
 " -*- vim -*-
 " FILE: "c:/vim/Vimfiles/plugin/multipleRanges.vim" {{{
-" LAST MODIFICATION: "Fri, 26 Jul 2002 14:51:49 Eastern Daylight Time"
+" LAST MODIFICATION: "Sat, 27 Jul 2002 21:02:33 Eastern Daylight Time"
 " (C) 2002 by Salman Halim, <salmanhalim@hotmail.com>
 " $Id:$ }}}
 
 " Version history:
-
+"
+" 1.65: Removed the <unique> keyword  from the internal script mappings; Vikas
+" Agnihotri  pointed  out that  this  was  causing  a problem  with  potential
+" reloading of the script while not adding anything to the ease of use.
 "
 " 1.6: Added  support for  user-defined highlights for  the ranges  (GUI only;
 " will do cterm if asked).  Suggested by Vikas Agnihotri.
@@ -99,22 +102,22 @@ let loaded_multipleRanges = 1
 if ( !hasmapto( '<Plug>AddRange', 'v' ) )
   vmap <unique> <Leader>ar <Plug>AddRange
 endif
-vmap <silent> <unique> <script> <Plug>AddRange :call <SID>AddRange( line( "'<" ), line ( "'>" ) )<CR>
+vmap <silent> <script> <Plug>AddRange :call <SID>AddRange( line( "'<" ), line ( "'>" ) )<CR>
 
 if ( !hasmapto( '<Plug>AddRange', 'n' ) )
   nmap <unique> <Leader>ar <Plug>AddRange
 endif
-nmap <silent> <unique> <script> <Plug>AddRange :call <SID>AddRange( line( "." ), line ( "." ) )<CR>
+nmap <silent> <script> <Plug>AddRange :call <SID>AddRange( line( "." ), line ( "." ) )<CR>
 
 if ( !hasmapto( '<Plug>ClearRanges', 'n' ) )
   nmap <unique> <Leader>cr <Plug>ClearRanges
 endif
-nmap <silent> <unique> <script> <Plug>ClearRanges :Clearranges<CR>
+nmap <silent> <script> <Plug>ClearRanges :Clearranges<CR>
 
 if ( !hasmapto( '<Plug>InvertRanges', 'n' ) )
   nmap <unique> <Leader>ir <Plug>InvertRanges
 endif
-nmap <silent> <unique> <script> <Plug>InvertRanges :Invertranges<CR>
+nmap <silent> <script> <Plug>InvertRanges :Invertranges<CR>
 
 
 function! <SID>AddRange( l1, l2 ) range
