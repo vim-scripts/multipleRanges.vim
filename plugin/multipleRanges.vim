@@ -1,10 +1,22 @@
 " -*- vim -*-
 " FILE: "c:/vim/Vimfiles/plugin/multipleRanges.vim" {{{
-" LAST MODIFICATION: "Thu, 25 Jul 2002 17:10:05 Eastern Daylight Time"
+" LAST MODIFICATION: "Fri, 26 Jul 2002 10:48:16 Eastern Daylight Time"
 " (C) 2002 by Salman Halim, <salmanhalim@hotmail.com>
 " $Id:$ }}}
 
 " Version history:
+"
+" 1.5:  Changed  the  variables  within   to  be  buffer-specific  instead  of
+" window-specific. This was causing problems when another buffer was opened in
+" the same window.
+"
+" Forgot to  add dependency  information; depends  on my  variableSort.vim and
+" getVar.vim scripts.
+"
+" Main feature addition: New mapping to  invert the ranges (all bits that were
+" in a range  become deselected and everything else becomes  part of a range).
+" Warning: can be  slow in a large  file because of all  the highlighting that
+" has to be done.
 "
 " 1.2: Cleans  up better once  a set of ranges  is cleared (the  variables are
 " unlet).
@@ -12,7 +24,8 @@
 " Added  an  option (buffer  or  global  variable called  'consolidateRanges')
 " which,  if  set  to 1,  will  cause  Rangecommand  to  first sort  and  then
 " consolidate  overlapping ranges  into a  single range  before executing  the
-" command. The ranges will remain consolidated once the command is done.
+" command. The ranges will remain consolidated once the command is done.  (The
+" default is NOT to do the consolidation.)
 "
 " 1.1: Added the Showranges command to spew the currently added ranges.
 "
@@ -29,6 +42,7 @@
 " <Leader>ar (visual mode):  add selected lines as a new range
 " <Leader>ar (normal mode):  add current line as a new range
 " <Leader>cr (normal mode):  clear all ranges
+" <Leader>ir (normal mode):  invert ranges
 "
 " Commands:
 " Rangecommand:  executes the arguments as an ex command across all the ranges
@@ -82,16 +96,21 @@ if ( !hasmapto( '<Plug>ClearRanges', 'n' ) )
 endif
 nmap <silent> <unique> <script> <Plug>ClearRanges :Clearranges<CR>
 
+if ( !hasmapto( '<Plug>InvertRanges', 'n' ) )
+  nmap <unique> <Leader>ir <Plug>InvertRanges
+endif
+nmap <silent> <unique> <script> <Plug>InvertRanges :Invertranges<CR>
+
 
 function! <SID>AddRange( l1, l2 ) range
   " first range for this window
-  if ( !exists( 'w:numRanges' ) )
-    let w:numRanges = 0
+  if ( !exists( 'b:numRanges' ) )
+    let b:numRanges = 0
   endif
 
-  let w:rangeS{w:numRanges} = a:l1
-  let w:rangeE{w:numRanges} = a:l2
-  let w:numRanges = w:numRanges + 1
+  let b:rangeS{b:numRanges} = a:l1
+  let b:rangeE{b:numRanges} = a:l2
+  let b:numRanges = b:numRanges + 1
 
   let i = a:l1
   while ( i <= a:l2 )
@@ -102,34 +121,34 @@ endfunction
 
 " the swap function used by the variableSort plugin
 function! MultipleRangeSwap( sub1, sub2 )
-  let temp = w:rangeS{a:sub1}
-  let w:rangeS{a:sub1} = w:rangeS{a:sub2}
-  let w:rangeS{a:sub2} = temp
+  let temp = b:rangeS{a:sub1}
+  let b:rangeS{a:sub1} = b:rangeS{a:sub2}
+  let b:rangeS{a:sub2} = temp
 
-  let temp = w:rangeE{a:sub1}
-  let w:rangeE{a:sub1} = w:rangeE{a:sub2}
-  let w:rangeE{a:sub2} = temp
+  let temp = b:rangeE{a:sub1}
+  let b:rangeE{a:sub1} = b:rangeE{a:sub2}
+  let b:rangeE{a:sub2} = temp
 endfunction
 
 " Used to sort the  ranges -- just calls the sorting  routine specified in the
 " variableSort plugin.
-function! SortRanges()
-  call SortArray( "w:rangeS", 0, w:numRanges - 1, 1, "MultipleRangeSwap" )
+function! <SID>SortRanges()
+  call SortArray( "b:rangeS", 0, b:numRanges - 1, 1, "MultipleRangeSwap" )
 endfunction
 
-function! ConsolidateRanges()
-  call SortRanges()
+function! <SID>ConsolidateRanges()
+  call s:SortRanges()
 
   " Showranges
 
   let numConsolidations = 0
   let i = 0
   let j = i + 1
-  while ( j < w:numRanges )
-    if ( w:rangeE{i} >= ( w:rangeS{j} - 1 ) )
+  while ( j < b:numRanges )
+    if ( b:rangeE{i} >= ( b:rangeS{j} - 1 ) )
       " echo "Consolidating " . i . " and " . j
-      let w:rangeE{i} = s:Max( w:rangeE{i}, w:rangeE{j} )
-      let w:rangeS{j} = -1
+      let b:rangeE{i} = s:Max( b:rangeE{i}, b:rangeE{j} )
+      let b:rangeS{j} = -1
       let numConsolidations = numConsolidations + 1
     else
       let i = j
@@ -141,17 +160,17 @@ function! ConsolidateRanges()
 
   let i = 0
   let j = -1
-  while ( i < w:numRanges )
-    if ( w:rangeS{i} == -1 )
+  while ( i < b:numRanges )
+    if ( b:rangeS{i} == -1 )
       if ( j == -1 )
         let j = i
         " echo "Found a blank at " . j
       endif
     elseif ( j != -1 )
       " echo "Found a candidate at " . i
-      let w:rangeS{j} = w:rangeS{i}
-      let w:rangeE{j} = w:rangeE{i}
-      let w:rangeS{i} = -1
+      let b:rangeS{j} = b:rangeS{i}
+      let b:rangeE{j} = b:rangeE{i}
+      let b:rangeS{i} = -1
       let i = j
       let j = -1
     endif
@@ -161,14 +180,14 @@ function! ConsolidateRanges()
 
   " Showranges
 
-  let i = w:numRanges - numConsolidations
-  while ( i < w:numRanges )
-    unlet w:rangeS{i}
-    unlet w:rangeE{i}
-    " echo w:rangeS{i}
+  let i = b:numRanges - numConsolidations
+  while ( i < b:numRanges )
+    unlet b:rangeS{i}
+    unlet b:rangeE{i}
+    " echo b:rangeS{i}
     let i = i + 1
   endwhile
-  let w:numRanges = w:numRanges - numConsolidations
+  let b:numRanges = b:numRanges - numConsolidations
 
   " Showranges
 endfunction
@@ -184,9 +203,9 @@ endfunction
 
 function! <SID>ShowRanges()
   let i = 0
-  while ( i < w:numRanges )
-    let numLines = w:rangeE{i} - w:rangeS{i} + 1
-    echo w:rangeS{i} . "-" . w:rangeE{i} . " (" . numLines . " line" . (numLines != 1 ? "s" : "") . ")"
+  while ( i < b:numRanges )
+    let numLines = b:rangeE{i} - b:rangeS{i} + 1
+    echo b:rangeS{i} . "-" . b:rangeE{i} . " (" . numLines . " line" . (numLines != 1 ? "s" : "") . ")"
     let i = i + 1
   endwhile
 endfunction
@@ -194,12 +213,12 @@ com! Showranges call s:ShowRanges()
 
 function! <SID>RangeCommand( theCommand )
   if ( GetVar( 'consolidateRanges', 0 ) == 1 )
-    call ConsolidateRanges()
+    call s:ConsolidateRanges()
   endif
 
   let i = 0
-  while ( i < w:numRanges )
-    execute w:rangeS{i} . ',' . w:rangeE{i} . ' ' . a:theCommand
+  while ( i < b:numRanges )
+    execute b:rangeS{i} . ',' . b:rangeE{i} . ' ' . a:theCommand
     let i = i + 1
   endwhile
 endfunction
@@ -209,15 +228,46 @@ function! <SID>ClearRanges()
   syn clear Ranges
 
   let i = 0
-  while ( i < w:numRanges )
-    unlet w:rangeS{i}
-    unlet w:rangeE{i}
+  while ( i < b:numRanges )
+    unlet b:rangeS{i}
+    unlet b:rangeE{i}
 
     let i = i + 1
   endwhile
 
-  let w:numRanges = 0
+  let b:numRanges = 0
 endfunction
 com! Clearranges call s:ClearRanges()
+
+function! <SID>InvertRanges()
+  call s:ConsolidateRanges()
+
+  let i = 0
+  let j = 0
+  let newS{i} = 1
+
+  while ( j < b:numRanges )
+    let newE{i} = b:rangeS{j} - 1
+    let i = i + 1
+    let newS{i} = b:rangeE{j} + 1
+    let j = j + 1
+  endwhile
+
+  let newE{i} = line( '$' )
+
+  Clearranges
+
+  let j = 0
+  while ( j <= i )
+    " echo newS{j} . ", " . newE{j}
+    if ( newE{j} >= newS{j} )
+      " echo "Yes"
+      call s:AddRange( newS{j}, newE{j} )
+    endif
+
+    let j = j + 1
+  endwhile
+endfunction
+com! Invertranges call s:InvertRanges()
 
 hi Ranges guifg=grey90 guibg=black gui=reverse
