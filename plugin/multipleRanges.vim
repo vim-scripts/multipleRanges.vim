@@ -1,10 +1,14 @@
 " -*- vim -*-
 " FILE: "c:/vim/Vimfiles/plugin/multipleRanges.vim" {{{
-" LAST MODIFICATION: "Fri, 26 Jul 2002 10:48:16 Eastern Daylight Time"
+" LAST MODIFICATION: "Fri, 26 Jul 2002 14:51:49 Eastern Daylight Time"
 " (C) 2002 by Salman Halim, <salmanhalim@hotmail.com>
 " $Id:$ }}}
 
 " Version history:
+
+"
+" 1.6: Added  support for  user-defined highlights for  the ranges  (GUI only;
+" will do cterm if asked).  Suggested by Vikas Agnihotri.
 "
 " 1.5:  Changed  the  variables  within   to  be  buffer-specific  instead  of
 " window-specific. This was causing problems when another buffer was opened in
@@ -16,7 +20,7 @@
 " Main feature addition: New mapping to  invert the ranges (all bits that were
 " in a range  become deselected and everything else becomes  part of a range).
 " Warning: can be  slow in a large  file because of all  the highlighting that
-" has to be done.
+" has to be done.  Suggested by Dan Sharp.
 "
 " 1.2: Cleans  up better once  a set of ranges  is cleared (the  variables are
 " unlet).
@@ -50,6 +54,17 @@
 " Showranges: spews the  list of ranges in the list  (in case they've scrolled
 " of the screen or something); just  a convenience feature. Not a particularly
 " pretty display or anything.
+"
+" Options (can  be set globally  as g:<variable> or  on a per-buffer  basis as
+" b:<variable>):
+" consolidateRanges (default 0):  whether or not to sort and consolidate
+" overlapping ranges before executing commands
+"
+" multipleRangesGuifg (default  'grey90'): default highlight  background color
+" for range
+" multipleRangesGuibg  (default 'black'):  default highlight  foreground color
+" for range
+" multipleRangesGui (default 'reverse'):  default highlight gui for range
 "
 " Note  that substitute  operations (such  as through  the :s  command) should
 " probably be ended with  the 'e' flag (no error if  nothing found) since each
@@ -270,4 +285,5 @@ function! <SID>InvertRanges()
 endfunction
 com! Invertranges call s:InvertRanges()
 
-hi Ranges guifg=grey90 guibg=black gui=reverse
+" the highlight colors to use for the range
+execute "hi Ranges guifg=" . GetVar( "multipleRangesGuifg", "grey90" ) . " guibg=" . GetVar( "multipleRangesGuibg", "black" ) . " gui=" . GetVar( "multipleRangesGui", "reverse" )
