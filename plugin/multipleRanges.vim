@@ -1,10 +1,16 @@
 " -*- vim -*-
 " FILE: "c:/vim/Vimfiles/plugin/multipleRanges.vim" {{{
-" LAST MODIFICATION: "Sat, 27 Jul 2002 21:02:33 Eastern Daylight Time"
+" LAST MODIFICATION: "Tue, 20 Aug 2002 11:20:55 Eastern Daylight Time"
 " (C) 2002 by Salman Halim, <salmanhalim@hotmail.com>
 " $Id:$ }}}
 
 " Version history:
+"
+" 1.7: Added a new command (Rangecommandnormal) which allows for a normal-mode
+" command to be  executed on the ranges. Also added  mappings to quickly enter
+" the Rangecommand and  Rangecommandnormal command-lines. Added error-checking
+" in  case there  are  no  ranges currently  selected  when  the commands  are
+" executed.
 "
 " 1.65: Removed the <unique> keyword  from the internal script mappings; Vikas
 " Agnihotri  pointed  out that  this  was  causing  a problem  with  potential
@@ -50,10 +56,20 @@
 " <Leader>ar (normal mode):  add current line as a new range
 " <Leader>cr (normal mode):  clear all ranges
 " <Leader>ir (normal mode):  invert ranges
+" <Leader>rc (normal mode):  Go   to   the   command-line   with   the    word
+"                            'Rangecommand' typed  in, waiting for  the actual
+"                            command.
+" <Leader>rn (normal mode):  Go   to   the   command-line   with   the    word
+"                            'Rangecommandnormal'  typed in,  waiting for  the
+"                            actual command.
 "
 " Commands:
 " Rangecommand:  executes the arguments as an ex command across all the ranges
 " specified.
+" Rangecommandnormal:  executes a  normal-mode sequence  of keystrokes  on the
+" ranges.  For  example,  to  convert  a set  of  ranges  to  upper-case,  use
+" :Rangecommandnormal gU -- this will behave as if each of the ranges had been
+" selected visually (line-wise) and then gU hit.
 " Showranges: spews the  list of ranges in the list  (in case they've scrolled
 " of the screen or something); just  a convenience feature. Not a particularly
 " pretty display or anything.
@@ -78,20 +94,6 @@
 " Range  highlighting  is  done  through  the Ranges  syntax  item;  this  can
 " obviously be  changed to anything  the user desires. Suggestion:  a slightly
 " lighter background than used in Visual mode.
-
-" TODO:
-" Allow for range inversion.
-"
-" Possible options (if people actually ask for them):
-"
-" Consolidate ranges  (overlapped ranges become  one range) -- only  works for
-" sorted  ranges --  not  consolidating allows  for  recursive action  (easily
-" avoided by not specifying overlapped ranges)
-"
-" Sort ranges (whether  commands should be applied to the  ranges in the order
-" they were specified or whether the range list should be sorted)
-"
-" Initially, don't consolidate or sort ranges
 
 
 if exists("loaded_multipleRanges")
@@ -118,6 +120,18 @@ if ( !hasmapto( '<Plug>InvertRanges', 'n' ) )
   nmap <unique> <Leader>ir <Plug>InvertRanges
 endif
 nmap <silent> <script> <Plug>InvertRanges :Invertranges<CR>
+
+if ( !hasmapto( '<Plug>RangeCommand', 'n' ) )
+  nmap <unique> <Leader>rc <Plug>RangeCommand
+endif
+nmap <script> <Plug>RangeCommand :Rangecommand<Space>
+
+" This  isn't called  <Plug>RangeCommandNormal because  of the  ambiguity with
+" <Plug>RangeCommand which causes Vim to pause until the input times out.
+if ( !hasmapto( '<Plug>NormalangeCommand', 'n' ) )
+  nmap <unique> <Leader>rn <Plug>NormalRangeCommand
+endif
+nmap <script> <Plug>NormalRangeCommand :Rangecommandnormal<Space>
 
 
 function! <SID>AddRange( l1, l2 ) range
@@ -230,6 +244,10 @@ endfunction
 com! Showranges call s:ShowRanges()
 
 function! <SID>RangeCommand( theCommand )
+  if ( !exists( 'b:numRanges' ) )
+    return
+  endif
+
   if ( GetVar( 'consolidateRanges', 0 ) == 1 )
     call s:ConsolidateRanges()
   endif
@@ -237,10 +255,30 @@ function! <SID>RangeCommand( theCommand )
   let i = 0
   while ( i < b:numRanges )
     execute b:rangeS{i} . ',' . b:rangeE{i} . ' ' . a:theCommand
+
     let i = i + 1
   endwhile
 endfunction
 com! -nargs=+ -complete=command Rangecommand call s:RangeCommand( <q-args> )
+
+function! <SID>RangeCommandNormal( theCommand )
+  if ( !exists( 'b:numRanges' ) )
+    return
+  endif
+
+  if ( GetVar( 'consolidateRanges', 0 ) == 1 )
+    call s:ConsolidateRanges()
+  endif
+
+  let i = 0
+  while ( i < b:numRanges )
+    execute "normal! " . b:rangeS{i} . "GV" . b:rangeE{i} . "G"
+    execute "normal " . a:theCommand
+
+    let i = i + 1
+  endwhile
+endfunction
+com! -nargs=+ -complete=command Rangecommandnormal call s:RangeCommandNormal( <q-args> )
 
 function! <SID>ClearRanges()
   syn clear Ranges
