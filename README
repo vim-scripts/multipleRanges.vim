@@ -1,0 +1,5 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=352
+
+This script lets you choose multiple non-consecutive ranges and then execute commands on them all at the same time.  Just visually select a range of lines and hit the mapping sequence.  Repeat until all the ranges have been selected (they will be highlighted).  Then, execute the script-defined command Rangecommand with the actual command (and arguments) as arguments to Rangecommand and it'll do it.  The ranges will remain selected until you execute the reset mapping allowing you to execute more commands on the ranges.
+
+NOTE:  VERSION 1.2 AND ABOVE DEPEND ON MY getVar.vim vimscript#353 AND variableSort.vim vimscript#354.  Sorry I neglected to mention that before.
