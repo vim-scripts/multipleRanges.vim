@@ -6,6 +6,8 @@
 
 " Version history:
 "
+" 1.8: No new functionality; brought the plugin up to version 7.2, using Lists and removing the dependence on variableSort.vim (getVar.vim is still required).
+"
 " 1.7: Added a new command (Rangecommandnormal) which allows for a normal-mode
 " command to be  executed on the ranges. Also added  mappings to quickly enter
 " the Rangecommand and  Rangecommandnormal command-lines. Added error-checking
@@ -135,14 +137,13 @@ nmap <script> <Plug>NormalRangeCommand :Rangecommandnormal<Space>
 
 
 function! <SID>AddRange( l1, l2 ) range
-  " first range for this window
-  if ( !exists( 'b:numRanges' ) )
-    let b:numRanges = 0
-  endif
+  " SALMAN: Replace with len( b:multipleRanges_ranges )
+  call Allocate( 'b:multipleRanges_numRanges', 0 )
+  call Allocate( 'b:multipleRanges_ranges', [] )
 
-  let b:rangeS{b:numRanges} = a:l1
-  let b:rangeE{b:numRanges} = a:l2
-  let b:numRanges = b:numRanges + 1
+  let b:multipleRanges_ranges += [ [ a:l1, a:l2 ] ]
+
+  let b:multipleRanges_numRanges += 1
 
   let i = a:l1
   while ( i <= a:l2 )
@@ -151,22 +152,17 @@ function! <SID>AddRange( l1, l2 ) range
   endwhile
 endfunction
 
-" the swap function used by the variableSort plugin
-function! MultipleRangeSwap( sub1, sub2 )
-  let temp = b:rangeS{a:sub1}
-  let b:rangeS{a:sub1} = b:rangeS{a:sub2}
-  let b:rangeS{a:sub2} = temp
-
-  let temp = b:rangeE{a:sub1}
-  let b:rangeE{a:sub1} = b:rangeE{a:sub2}
-  let b:rangeE{a:sub2} = temp
+function! CompareRanges( range1, range2 )
+  return a:range1[ 0 ] == a:range2[ 0 ] ? 0 : a:range1[ 0 ] > a:range2[ 0 ] ? 1 : -1
 endfunction
+let s:CompareRangeReference = function( "CompareRanges" )
 
 " Used to sort the  ranges -- just calls the sorting  routine specified in the
 " variableSort plugin.
 function! <SID>SortRanges()
-  call SortArray( "b:rangeS", 0, b:numRanges - 1, 1, "MultipleRangeSwap" )
+  call sort( b:multipleRanges_ranges, s:CompareRangeReference )
 endfunction
+com! Sortranges call s:SortRanges()
 
 function! <SID>ConsolidateRanges()
   call s:SortRanges()
@@ -176,11 +172,11 @@ function! <SID>ConsolidateRanges()
   let numConsolidations = 0
   let i = 0
   let j = i + 1
-  while ( j < b:numRanges )
-    if ( b:rangeE{i} >= ( b:rangeS{j} - 1 ) )
+  while ( j < b:multipleRanges_numRanges )
+    if ( b:multipleRanges_ranges[ i ][ 1 ] >= ( b:multipleRanges_ranges[ j ][ 0 ] - 1 ) )
       " echo "Consolidating " . i . " and " . j
-      let b:rangeE{i} = s:Max( b:rangeE{i}, b:rangeE{j} )
-      let b:rangeS{j} = -1
+      let b:multipleRanges_ranges[ i ][ 1 ] = max( [ b:multipleRanges_ranges[ i ][ 1 ], b:multipleRanges_ranges[ j ][ 1 ] ] )
+      let b:multipleRanges_ranges[ j ][ 0 ] = -1
       let numConsolidations = numConsolidations + 1
     else
       let i = j
@@ -192,17 +188,17 @@ function! <SID>ConsolidateRanges()
 
   let i = 0
   let j = -1
-  while ( i < b:numRanges )
-    if ( b:rangeS{i} == -1 )
+  while ( i < b:multipleRanges_numRanges )
+    if ( b:multipleRanges_ranges[ i ][ 0 ] == -1 )
       if ( j == -1 )
         let j = i
         " echo "Found a blank at " . j
       endif
     elseif ( j != -1 )
       " echo "Found a candidate at " . i
-      let b:rangeS{j} = b:rangeS{i}
-      let b:rangeE{j} = b:rangeE{i}
-      let b:rangeS{i} = -1
+      let b:multipleRanges_ranges[ j ][ 0 ] = b:multipleRanges_ranges[ i ][ 0 ]
+      let b:multipleRanges_ranges[ j ][ 1 ] = b:multipleRanges_ranges[ i ][ 1 ]
+      let b:multipleRanges_ranges[ i ][ 0 ] = -1
       let i = j
       let j = -1
     endif
@@ -212,39 +208,31 @@ function! <SID>ConsolidateRanges()
 
   " Showranges
 
-  let i = b:numRanges - numConsolidations
-  while ( i < b:numRanges )
-    unlet b:rangeS{i}
-    unlet b:rangeE{i}
-    " echo b:rangeS{i}
+  let i = b:multipleRanges_numRanges - numConsolidations
+  while ( i < b:multipleRanges_numRanges )
+    unlet b:multipleRanges_ranges[ i ][ 0 ]
+    unlet b:multipleRanges_ranges[ i ][ 1 ]
+    " echo b:multipleRanges_ranges[ i ][ 0 ]
     let i = i + 1
   endwhile
-  let b:numRanges = b:numRanges - numConsolidations
+  let b:multipleRanges_numRanges = b:multipleRanges_numRanges - numConsolidations
 
   " Showranges
 endfunction
-
-" Returns the higher of two numbers
-function! <SID>Max( n1, n2 )
-  if ( a:n1 > a:n2 )
-    return a:n1
-  else
-    return a:n2
-  endif
-endfunction
+com! Consolidateranges call s:ConsolidateRanges()
 
 function! <SID>ShowRanges()
   let i = 0
-  while ( i < b:numRanges )
-    let numLines = b:rangeE{i} - b:rangeS{i} + 1
-    echo b:rangeS{i} . "-" . b:rangeE{i} . " (" . numLines . " line" . (numLines != 1 ? "s" : "") . ")"
+  while ( i < b:multipleRanges_numRanges )
+    let numLines = b:multipleRanges_ranges[ i ][ 1 ] - b:multipleRanges_ranges[ i ][ 0 ] + 1
+    echo b:multipleRanges_ranges[ i ][ 0 ] . "-" . b:multipleRanges_ranges[ i ][ 1 ] . " (" . numLines . " line" . (numLines != 1 ? "s" : "") . ")"
     let i = i + 1
   endwhile
 endfunction
 com! Showranges call s:ShowRanges()
 
 function! <SID>RangeCommand( theCommand )
-  if ( !exists( 'b:numRanges' ) )
+  if ( !exists( 'b:multipleRanges_ranges' ) )
     return
   endif
 
@@ -253,8 +241,8 @@ function! <SID>RangeCommand( theCommand )
   endif
 
   let i = 0
-  while ( i < b:numRanges )
-    execute b:rangeS{i} . ',' . b:rangeE{i} . ' ' . a:theCommand
+  while ( i < b:multipleRanges_numRanges )
+    execute b:multipleRanges_ranges[ i ][ 0 ] . ',' . b:multipleRanges_ranges[ i ][ 1 ] . ' ' . a:theCommand
 
     let i = i + 1
   endwhile
@@ -262,7 +250,7 @@ endfunction
 com! -nargs=+ -complete=command Rangecommand call s:RangeCommand( <q-args> )
 
 function! <SID>RangeCommandNormal( theCommand )
-  if ( !exists( 'b:numRanges' ) )
+  if ( !exists( 'b:multipleRanges_ranges' ) )
     return
   endif
 
@@ -271,8 +259,8 @@ function! <SID>RangeCommandNormal( theCommand )
   endif
 
   let i = 0
-  while ( i < b:numRanges )
-    execute "normal! " . b:rangeS{i} . "GV" . b:rangeE{i} . "G"
+  while ( i < b:multipleRanges_numRanges )
+    execute "normal! " . b:multipleRanges_ranges[ i ][ 0 ] . "GV" . b:multipleRanges_ranges[ i ][ 1 ] . "G"
     execute "normal " . a:theCommand
 
     let i = i + 1
@@ -283,46 +271,44 @@ com! -nargs=+ -complete=command Rangecommandnormal call s:RangeCommandNormal( <q
 function! <SID>ClearRanges()
   syn clear Ranges
 
-  let i = 0
-  while ( i < b:numRanges )
-    unlet b:rangeS{i}
-    unlet b:rangeE{i}
-
-    let i = i + 1
-  endwhile
-
-  let b:numRanges = 0
+  let b:multipleRanges_numRanges = 0
+  let b:multipleRanges_ranges    = []
 endfunction
 com! Clearranges call s:ClearRanges()
 
 function! <SID>InvertRanges()
   call s:ConsolidateRanges()
 
-  let i = 0
-  let j = 0
-  let newS{i} = 1
+  " Showranges
 
-  while ( j < b:numRanges )
-    let newE{i} = b:rangeS{j} - 1
+  let i    = 0
+  let j    = 0
+  let newS = [ 1 ]
+  let newE = []
+
+  while ( j < b:multipleRanges_numRanges )
+    let newE += [ b:multipleRanges_ranges[ j ][ 0 ] - 1 ]
     let i = i + 1
-    let newS{i} = b:rangeE{j} + 1
+    let newS += [ b:multipleRanges_ranges[ j ][ 1 ] + 1 ]
     let j = j + 1
   endwhile
 
-  let newE{i} = line( '$' )
+  let newE += [ line( '$' ) ]
 
   Clearranges
 
   let j = 0
   while ( j <= i )
-    " echo newS{j} . ", " . newE{j}
-    if ( newE{j} >= newS{j} )
+    " echo newS[ j ] . ", " . newE[ j ]
+    if ( newE[ j ] >= newS[ j ] )
       " echo "Yes"
-      call s:AddRange( newS{j}, newE{j} )
+      call s:AddRange( newS[ j ], newE[ j ] )
     endif
 
     let j = j + 1
   endwhile
+
+  " Showranges
 endfunction
 com! Invertranges call s:InvertRanges()
 
